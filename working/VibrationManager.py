@@ -5,12 +5,12 @@ import board, neopixel
 class Control:
 
     def __init__(self, samples, num_leds):
-        self.sleep_time = 0.25
+        self.sleep_time = 0.1 #Animation timer
         self.hit_color = (255,0,0)
         self._num_samples = samples
 
         self.accel = Accelerometer()
-        self.LED = LEDController(num_ledsS)
+        self.LED = LEDController(num_leds)
         self.CalibrateSensor(self._num_samples)
         time.sleep(self.sleep_time)
         self.animationPosition = 0
@@ -108,7 +108,7 @@ class Accelerometer:
     def withinTol(self, R):
         upper = self.idealR * (1 + self.tol)
         lower = self.idealR * (1 - self.tol)
-        print("{:2f} < {:2f} < {:.2f}".format(lower, R, upper))
+        # print("{:2f} < {:2f} < {:.2f}".format(lower, R, upper))
         return R < upper and R > lower
 
     def CheckVibration(self):
