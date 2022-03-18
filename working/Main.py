@@ -1,21 +1,25 @@
-from VibrationManager import Control, Accelerometer
+from VibrationManager import Control, Accelerometer, BounceClassifer
 import time, math
 import datetime
 
 number_leds = 77
 calibration_samples = 60
+pos = 0
 
 C = Control(calibration_samples, number_leds)
-data = ""
-print("Starting Detection")
-for i in range(10000):
-    val = C.accel.getResultant()
-    data += "{:.2f}\n".format(val)
-#     if not C.accel.withinTol(val):
-#         print(val)
-#     C.DetectVibration()
-#     time.sleep(0.01)
+classifier = BounceClassifer(tol = 5, ratio_threshold=2.5)
 
-with open("data.txt", "w") as f:
-    f.write(data)
-    f.close()
+print("Starting Detection")
+while True:
+    vals = C.accel.CurrentVals()
+    if classifier.running(vals["z"]):
+        print("Hit Detected!")
+        C.CalibrateSensor(calibration_samples)
+    else:
+        C.LED.RunAnimation(pos)
+        if pos >= number_leds - 1:
+            pos = 0
+        else:     
+            pos += 1
+        
+    # time.sleep(0.01)

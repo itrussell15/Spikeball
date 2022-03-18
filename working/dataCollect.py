@@ -37,7 +37,7 @@ calVals = CalibrateSensor(25)
 
 print("Collect!")
 output = []
-for i in range(500):
+for i in range(300):
     output.append([accel.read_x_gyro(calVals["gx"]) - 1, accel.read_y_gyro(calVals["gy"]) - 1, accel.read_z_gyro(calVals["gz"]) - 1,\
     accel.read_x_accel(calVals["ax"]) - 1, accel.read_y_accel(calVals["ay"]) - 1, accel.read_z_accel(calVals["az"]) - 1])
     time.sleep(0.01)
