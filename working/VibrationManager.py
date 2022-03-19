@@ -1,6 +1,7 @@
-from . LowLevelSense import AccelLLC
+from LowLevelSense import AccelLLC
 import time
 import math
+import neopixel
 
 
 class Control:
@@ -23,23 +24,24 @@ class Control:
             vals["y"] += curr["y"]
             vals["z"] += curr["z"]
 
-            time.sleep(0.05)
+            time.sleep(0.01)
         calVals = {"x": 0, "y": 0, "z": 0}
         for i in vals:
             calVals[i] = vals[i] / samples
         self.accel.set_calVals(calVals)
 
     def DetectVibration(self):
-        if self.accel.CheckVibration():
-            print("Hit Detected")
-            time.sleep(self.sleep_time)
-            self.CalibrateSensor(self._num_samples)
-            self.animationPosition = 0
-        else:
-            if self.animationPosition >= self.LED.NUM_LEDS:
-                self.animationPosition = 0
-            self.LED.RunAnimation(self.animationPosition)
-            self.animationPosition += 1
+        return self.accel.CheckVibration()
+        # if self.accel.CheckVibration():
+        #     print("Hit Detected")
+        #     time.sleep(self.sleep_time)
+        #     self.CalibrateSensor(self._num_samples)
+        #     self.animationPosition = 0
+        # else:
+        #     if self.animationPosition >= self.LED.NUM_LEDS:
+        #         self.animationPosition = 0
+        #     self.LED.RunAnimation(self.animationPosition)
+        #     self.animationPosition += 1
 
 
 class LEDController:
@@ -50,14 +52,20 @@ class LEDController:
         self.NUM_LEDS = num_leds
         self._control = neopixel.NeoPixel(board.D18, num_leds)
         self.fillRing((0, 0, 0))
+        self._control.show()
+        self._pos = 0
+        self._animationIndex = 0
+        self._myAnimations = self.AnimationController(self._control, self.NUM_LEDS)
+        self._animations = [
+            self._myAnimations.rainbow_cycle,
+            self._myAnimations.loading_bar,
+            self._myAnimations.single_looping,
+            ]
+        print("{} animations loaded".format(len(self._animations)))
 
     def calibrationRing(self, status, total):
         val = self.mapStatusToLeds(float(status/total))
-        self.fillRing((255, 0, 0))
-        # print(val)
-        # for i in range(val):
-        #     self._control[i] = (200, 200, 200)
-        # self._control.show()
+        # Associate with some animations?
 
     def mapStatusToLeds(self, status_val):
         val = math.floor(status_val * self.NUM_LEDS)
@@ -67,19 +75,33 @@ class LEDController:
     def fillRing(self, color=(255, 0, 0)):
         self._control.fill(color)
 
-    def RunAnimation(self, pos):
-        self._ThisAnimation(pos)
+    def changeAnimations(self):
+        if self._animationIndex >= len(self._animations) - 1:
+            self._animationIndex = 0
+        else:
+            self._animationIndex += 1
+        self._control.fill((0,0,0))
 
-    def _ThisAnimation(self, pos):
-        self._control.fill((0, 0, 0))
-        self._control[pos] = ((200, 200, 200))
+    def RunAnimation(self):
+        print("Animation Running: {}".format(self._animationIndex))
+        self._animations[self._animationIndex](self._pos)
+        if self._pos <= 255:
+            self._pos += 1
+        else:
+            self._pos = 0
+    #
+    # def _ThisAnimation(self, pos):
+    #     self._control.fill((0, 0, 0))
+    #     self._control[pos] = ((200, 200, 200))
 
     class AnimationController:
 
-        def __init__(self, animations):
-            self.pos = 0
+        def __init__(self, controller, leds):
+            self.num_leds = leds
+            self.control = controller
 
-        def _wheel(pos):
+        def _wheel(self, pos):
+            ORDER = neopixel.GRB
             if pos < 0 or pos > 255:
                 r = g = b = 0
             elif pos < 85:
@@ -98,11 +120,41 @@ class LEDController:
                 b = int(255 - pos * 3)
             return (r, g, b) if ORDER in (neopixel.RGB, neopixel.GRB) else (r, g, b, 0)
 
+        def rainbow_cycle(self, pos):
+            # for j in range(255):
+            for i in range(self.num_leds):
+                pixel_index = (i * 256 // self.num_leds) + pos
+                self.control[i] = self._wheel(pixel_index & 255)
+            self.control.show()
+
+        def loading_bar(self, pos):
+            mapped_pos = self.mapValue(pos)
+            print(mapped_pos)
+            if mapped_pos < self.num_leds:
+                self.control[mapped_pos] = (255, 255, 255)
+            else:
+                self.control.fill((0,0,0))
+
+        def single_looping(self, pos):
+            self.control.fill((0, 0, 0))
+            mapped = self.mapValue(pos)
+            if mapped <= self.num_leds - 1:
+                self.control[mapped] = ((200, 200, 200))
+            else:
+                self.control.fill((0,0,0))
+
+        # Returns a mapped value from 255 to the number of leds in the strip
+        def mapValue(self, value):
+            scaled = float(value) / float(255.0)
+            return math.floor(scaled * self.num_leds)
+
+
+
 
 
 class Accelerometer:
 
-    def __init__(self, cal_samples=75, tol=2.00):
+    def __init__(self, cal_samples=25, tol=2.0):
         self.calVals = {"x": 0, "y": 0, "z": 0}
         self.Accel = AccelLLC()
         self.idealR = math.sqrt(1**2 + 1**2 + 1**2)
@@ -139,6 +191,7 @@ class Accelerometer:
 
     def CheckVibration(self):
         R = self.getResultant()
+        #print(R)
         return not self.withinTol(R)
 
 
