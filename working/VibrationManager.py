@@ -1,8 +1,6 @@
 from LowLevelSense import AccelLLC
 import time
-import math
-import neopixel
-
+import math, random
 
 class Control:
 
@@ -11,157 +9,138 @@ class Control:
         self._num_samples = samples
 
         self.accel = Accelerometer()
-        self.LED = LEDController(num_leds)
         self.CalibrateSensor(self._num_samples)
 
-    def CalibrateSensor(self, samples):
-        print("Calibrating")
-        vals = {"x": 0, "y": 0, "z": 0}
-        self.LED.calibrationRing(0, samples)
-        for i in range(samples):
-            curr = self.accel.CurrentVals()
-            vals["x"] += curr["x"]
-            vals["y"] += curr["y"]
-            vals["z"] += curr["z"]
+    # def CalibrateSensor(self, samples):
 
-            time.sleep(0.01)
-        calVals = {"x": 0, "y": 0, "z": 0}
-        for i in vals:
-            calVals[i] = vals[i] / samples
-        self.accel.set_calVals(calVals)
 
     def DetectVibration(self):
         return self.accel.CheckVibration()
-        # if self.accel.CheckVibration():
-        #     print("Hit Detected")
-        #     time.sleep(self.sleep_time)
-        #     self.CalibrateSensor(self._num_samples)
-        #     self.animationPosition = 0
-        # else:
-        #     if self.animationPosition >= self.LED.NUM_LEDS:
-        #         self.animationPosition = 0
-        #     self.LED.RunAnimation(self.animationPosition)
-        #     self.animationPosition += 1
-
 
 class LEDController:
 
     def __init__(self, num_leds):
         import board
-        import neopixel
+
         self.NUM_LEDS = num_leds
         self._control = neopixel.NeoPixel(board.D18, num_leds)
-        self.fillRing((0, 0, 0))
+
+        self.fill((0, 0, 0))
         self._control.show()
+
         self._pos = 0
-        self._animationIndex = 0
-        self._myAnimations = self.AnimationController(self._control, self.NUM_LEDS)
-        self._animations = [
-            self._myAnimations.rainbow_cycle,
-            self._myAnimations.loading_bar,
-            self._myAnimations.single_looping,
-            ]
-        print("{} animations loaded".format(len(self._animations)))
+        self._index = 0
+        self._flag = 0
 
-    def calibrationRing(self, status, total):
-        val = self.mapStatusToLeds(float(status/total))
-        # Associate with some animations?
-
-    def mapStatusToLeds(self, status_val):
-        val = math.floor(status_val * self.NUM_LEDS)
-        # print("NEW")
-        return val if val > 0 else 0
-
-    def fillRing(self, color=(255, 0, 0)):
-        self._control.fill(color)
+    def AttachAnimations(self, animations):
+        self._animations = _animations
+        random.shuffle(self._animations )
 
     def changeAnimations(self):
-        if self._animationIndex >= len(self._animations) - 1:
-            self._animationIndex = 0
+        if self._index <= len(self._animations) - 1:
+            self._index +=1
         else:
-            self._animationIndex += 1
-        self._control.fill((0,0,0))
+            self._index = 0
+        self._control.fill((0, 0, 0))
 
     def RunAnimation(self):
-        print("Animation Running: {}".format(self._animationIndex))
         self._animations[self._animationIndex](self._pos)
         if self._pos <= 255:
             self._pos += 1
         else:
             self._pos = 0
-    #
-    # def _ThisAnimation(self, pos):
-    #     self._control.fill((0, 0, 0))
-    #     self._control[pos] = ((200, 200, 200))
+        self._control.show()
 
-    class AnimationController:
+    def _wheel(self, pos):
+        ORDER = neopixel.GRB
+        if pos < 0 or pos > 255:
+            r = g = b = 0
+        elif pos < 85:
+            r = int(pos * 3)
+            g = int(255 - pos * 3)
+            b = 0
+        elif pos < 170:
+            pos -= 85
+            r = int(255 - pos * 3)
+            g = 0
+            b = int(pos * 3)
+        else:
+            pos -= 170
+            r = 0
+            g = int(pos * 3)
+            b = int(255 - pos * 3)
+        return (r, g, b) if ORDER in (neopixel.RGB, neopixel.GRB) else (r, g, b, 0)
 
-        def __init__(self, controller, leds):
-            self.num_leds = leds
-            self.control = controller
+    def rainbow_cycle(self, pos):
+        # for j in range(255):
+        print("Rainbow Cycle")
+        for i in range(self.num_leds):
+            pixel_index = (i * 256 // self.num_leds) + pos
+            self.control[i] = self._wheel(pixel_index & 255)
+        self.control.show()
 
-        def _wheel(self, pos):
-            ORDER = neopixel.GRB
-            if pos < 0 or pos > 255:
-                r = g = b = 0
-            elif pos < 85:
-                r = int(pos * 3)
-                g = int(255 - pos * 3)
-                b = 0
-            elif pos < 170:
-                pos -= 85
-                r = int(255 - pos * 3)
-                g = 0
-                b = int(pos * 3)
-            else:
-                pos -= 170
-                r = 0
-                g = int(pos * 3)
-                b = int(255 - pos * 3)
-            return (r, g, b) if ORDER in (neopixel.RGB, neopixel.GRB) else (r, g, b, 0)
-
-        def rainbow_cycle(self, pos):
-            # for j in range(255):
-            for i in range(self.num_leds):
-                pixel_index = (i * 256 // self.num_leds) + pos
-                self.control[i] = self._wheel(pixel_index & 255)
-            self.control.show()
-
-        def loading_bar(self, pos):
-            mapped_pos = self.mapValue(pos)
-            print(mapped_pos)
-            if mapped_pos < self.num_leds:
+    def loading_bar(self, pos):
+        print("Loading Bar")
+        mapped_pos = self._mapValue(pos)
+        if mapped_pos < self.num_leds:
+            if flag == 0:
                 self.control[mapped_pos] = (255, 255, 255)
             else:
-                self.control.fill((0,0,0))
+                self.control[self.num_leds - mapped_pos] = (255,255,255)
+        else:
+            self._flag = 0 if self._flag == 1 else 0
 
-        def single_looping(self, pos):
-            self.control.fill((0, 0, 0))
-            mapped = self.mapValue(pos)
-            if mapped <= self.num_leds - 1:
-                self.control[mapped] = ((200, 200, 200))
-            else:
-                self.control.fill((0,0,0))
+    def single_looping(self, pos):
+        print("Single Looping")
+        self.control.fill((0, 0, 0))
+        self.control[pos] = ((200, 200, 200))
 
-        # Returns a mapped value from 255 to the number of leds in the strip
-        def mapValue(self, value):
-            scaled = float(value) / float(255.0)
-            return math.floor(scaled * self.num_leds)
+    def fillRed(self, pos):
+        print("Fill Red")
+        self.control.fill(255, 0, 0)
 
+    def fillWhite(self, pos):
+        print("Fill White")
+        self.control.fill(255, 255, 255)
 
+    def fillBlue(self, pos):
+        print("Fill Blue")
+        self.control.fill(0, 0, 255)
 
+    def fillGreen(self, pos):
+        print("Fill Green")
+        self.control.fill(0, 255, 0)
 
+    def breathingWhite(self, pos):
+        print("Fill White")
+        self.control.fill(i, i, i)
+
+    # Returns a mapped value from 255 to the number of leds in the strip
+    def _mapValue(self, value):
+        scaled = float(value) / float(255.0)
+        return math.floor(scaled * self.num_leds)
 
 class Accelerometer:
 
-    def __init__(self, cal_samples=25, tol=2.0):
-        self.calVals = {"x": 0, "y": 0, "z": 0}
+    def __init__(self, cal_samples, tol):
+        self._calVals = {"x": 0, "y": 0, "z": 0}
         self.Accel = AccelLLC()
         self.idealR = math.sqrt(1**2 + 1**2 + 1**2)
         self.tol = tol
 
-    def set_calVals(self, vals):
-        self.calVals = vals
+    def Calibrate(self, samples):
+        print("Calibrating")
+        vals = {"x": 0, "y": 0, "z": 0}
+        for i in range(samples):
+            curr = self.CurrentVals()
+            vals["x"] += curr["x"]
+            vals["y"] += curr["y"]
+            vals["z"] += curr["z"]
+            time.sleep(0.05)
+        calVals = {"x": 0, "y": 0, "z": 0}
+        for i in vals:
+            calVals[i] = vals[i] / samples
+        self._calVals = calVals
 
     def CurrentVals(self):
         x = self.Accel.read_x_accel()
@@ -191,16 +170,12 @@ class Accelerometer:
 
     def CheckVibration(self):
         R = self.getResultant()
-        #print(R)
+        # print(R)
         return not self.withinTol(R)
-
-
-
-
 
 class BounceClassifer:
 
-    def __init__(self, tol, ratio_threshold, response=None, samples=10, ):
+    def __init__(self, tol, ratio_threshold, response=None, samples=10):
         self.samples = samples
         self.tol = tol
         self.ratio_threshold = ratio_threshold
