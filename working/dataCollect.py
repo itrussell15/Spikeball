@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from LowLevelSense import AccelLLC
+from Accelerometer import AccelLLC
 import time, csv
-
-
 
 def CurrentVals():
     ax = accel.read_x_accel()
